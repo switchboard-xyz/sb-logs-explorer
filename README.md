@@ -6,7 +6,7 @@ ts-node main.ts \
 --startTime $START_UNIX_TIME_IN_SECONDS \
 --endTime $END_UNIX_TIME_IN_SECONDS \
 --filter "A" \
---url "https://switchboard.rpcpool.com/ec20ad2831092cfcef66d677539a"
+--url "https://switchboard.rpcpool.com/XXX"
 ```
 
 # to publish
