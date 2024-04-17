@@ -1,0 +1,27 @@
+{
+  "name": "@switchboard-xyz/solana-logs-lookup",
+  "author": "mitch@switchboard.xyz",
+  "license": "MIT",
+  "version": "1.0.8",
+  "description": "",
+  "main": "dist/bin.js",
+  "scripts": {
+    "build": "npx tsc && { echo '#!/usr/bin/env node'; cat dist/main.js; } > dist/bin.js && chmod +x dist/bin.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npx ts-node main.ts"
+  },
+  "bin": {
+    "solana-logs-lookup": "dist/bin.js"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.91.1",
+    "ts-node": "^10.9.2",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/yargs": "^17.0.11",
+    "ts-loader": "^9.5.1",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4"
+  }
+}

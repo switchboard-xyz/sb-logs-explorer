@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es6", // Compile to ES6 (consider your target audience; ES5 for older environments)
+    "module": "commonjs", // Use commonjs module system, as it's compatible with Node.js
+    "lib": [
+      "es6",
+      "dom"
+    ], // Include type definitions for ES6 and DOM APIs (adjust based on your needs)
+    "declaration": true, // Generate .d.ts files for your TypeScript files
+    "outDir": "./dist", // Output directory for the compiled files
+    "strict": true, // Enable all strict type-checking options
+    "esModuleInterop": true, // Enables compatibility with non-ES module spec compliant imports (like `import foo = require('foo')`)
+    "skipLibCheck": true, // Skip type checking of all declaration files (*.d.ts)
+    "forceConsistentCasingInFileNames": true, // Disallow inconsistently-cased references to the same file
+    "moduleResolution": "node" // Resolve modules using Node.js's module resolution algorithm
+  },
+  "include": [
+    "*"
+  ],
+  "exclude": [
+    "node_modules", // Exclude the node_modules directory
+    "**/*.test.ts", // Exclude test files
+    "**/*.spec.ts" // Exclude spec files
+  ]
+}
