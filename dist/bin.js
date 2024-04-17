@@ -95,21 +95,21 @@ function getTxSignatureAroundTimestamp(connection, timestamp) {
         let currentBlock;
         let midSlot = 0;
         console.log("Goal block time:", new Date(timestamp * 1000).toLocaleString());
-        while (maxSlot - minSlot > 1) {
+        while (maxSlot - minSlot > 10) {
             midSlot = minSlot + Math.floor((maxSlot - minSlot) / 2);
-            try {
-                currentBlock = (yield connection.getBlock(midSlot, {
-                    maxSupportedTransactionVersion: 0,
-                    transactionDetails: "none",
-                    commitment: "finalized",
-                }));
-            }
-            catch (error) {
-                currentBlock = (yield connection.getBlock(midSlot + 250, {
-                    maxSupportedTransactionVersion: 0,
-                    transactionDetails: "none",
-                    commitment: "finalized",
-                }));
+            while (true) {
+                try {
+                    currentBlock = (yield connection.getBlock(midSlot, {
+                        maxSupportedTransactionVersion: 0,
+                        transactionDetails: "none",
+                        commitment: "finalized",
+                    }));
+                    break;
+                }
+                catch (error) {
+                    console.error("Error fetching block:", error);
+                    midSlot -= 100;
+                }
             }
             if (currentBlock == null) {
                 console.log("Block not found");
@@ -136,7 +136,7 @@ function getTxSignatureAroundTimestamp(connection, timestamp) {
             }
             catch (error) {
                 console.error("Error fetching block:", error);
-                midSlot += 1;
+                midSlot -= 100;
             }
         }
         return currentBlock.transactions[0].transaction.signatures[0];
@@ -173,7 +173,7 @@ function loadTransactionLogs(connection, transactionSignature, startTime, filter
                         .filter((m) => m.includes(filter));
                     for (let log of logs) {
                         log = log.slice(regexLen);
-                        const out = `${tx.blockTime} (${timestamp}): ${log}`;
+                        const out = `${tx.blockTime} (${timestamp}) ${transactionSignature}: ${log}`;
                         LOG_MAP.set(tx.blockTime, out);
                         console.log(out);
                     }

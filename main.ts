@@ -69,7 +69,7 @@ async function getTxSignatureAroundTimestamp(
   let currentBlock;
   let midSlot = 0;
   console.log("Goal block time:", new Date(timestamp * 1000).toLocaleString());
-  while (maxSlot - minSlot > 1) {
+  while (maxSlot - minSlot > 10) {
     midSlot = minSlot + Math.floor((maxSlot - minSlot) / 2);
     while (true) {
       try {
@@ -81,7 +81,7 @@ async function getTxSignatureAroundTimestamp(
         break;
       } catch (error) {
         console.error("Error fetching block:", error);
-        midSlot += 1;
+        midSlot -= 100;
       }
     }
     if (currentBlock == null) {
@@ -111,7 +111,7 @@ async function getTxSignatureAroundTimestamp(
       break;
     } catch (error) {
       console.error("Error fetching block:", error);
-      midSlot += 1;
+      midSlot -= 100;
     }
   }
   return currentBlock.transactions[0].transaction.signatures[0];
@@ -140,9 +140,7 @@ async function loadTransactionLogs(
           tx = tx!;
           // Check if transaction exists
           // console.log(transaction);
-          const timestamp = new Date(
-            Number(tx.blockTime) * 1000
-          ).toISOString();
+          const timestamp = new Date(Number(tx.blockTime) * 1000).toISOString();
           let regex = /Program log: /;
           let regexLen = 13;
           if (argv.forEvents) {

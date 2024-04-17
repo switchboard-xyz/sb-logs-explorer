@@ -5,8 +5,8 @@ ts-node main.ts \
 --account qQcShWi6opRSuFcTfrjUePcjR6XzhPftztddhb5K7G5 \
 --startTime $START_UNIX_TIME_IN_SECONDS \
 --endTime $END_UNIX_TIME_IN_SECONDS \
---filter "ABC" \
---url "https://switchboard.rpcpool.com/XXX"
+--filter "A" \
+--url "https://switchboard.rpcpool.com/ec20ad2831092cfcef66d677539a"
 ```
 
 # to publish

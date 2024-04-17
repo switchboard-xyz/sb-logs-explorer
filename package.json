@@ -2,7 +2,7 @@
   "name": "@switchboard-xyz/solana-logs-lookup",
   "author": "mitch@switchboard.xyz",
   "license": "MIT",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "",
   "main": "dist/bin.js",
   "scripts": {
@@ -14,11 +14,14 @@
     "solana-logs-lookup": "dist/bin.js"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.30.0",
     "@solana/web3.js": "^1.91.1",
+    "big.js": "^6.2.1",
     "ts-node": "^10.9.2",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@types/big.js": "^6.2.2",
     "@types/yargs": "^17.0.11",
     "ts-loader": "^9.5.1",
     "webpack": "^5.91.0",

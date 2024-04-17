@@ -62,6 +62,7 @@ let argv = yargs(process.argv).options({
 }).argv;
 const sleep = (t) => new Promise((s) => setTimeout(s, t));
 const results = [];
+const signatures = [];
 (() => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const connection = new web3_js_1.Connection("https://api.mainnet-beta.solana.com");
@@ -69,7 +70,7 @@ const results = [];
         const wallet = new anchor.Wallet(web3_js_1.Keypair.generate());
         const provider = new anchor.AnchorProvider(connection, wallet, {});
         const idl = yield anchor.Program.fetchIdl(programId, provider);
-        const program = new anchor.Program(idl, programId, provider);
+        const program = new anchor.Program(idl, provider);
         const decoder = new anchor.BorshEventCoder(idl);
         const readInterface = readline.createInterface({
             input: fs.createReadStream(argv.input),
@@ -78,9 +79,11 @@ const results = [];
         });
         readInterface.on("line", function (line) {
             const parts = line.split(/ +/);
+            const signature = parts[parts.length - 2];
             const serialized = parts[parts.length - 1];
             const parsed = decoder.decode(serialized);
             if ((parsed === null || parsed === void 0 ? void 0 : parsed.name) === argv.eventName) {
+                signatures.push(signature);
                 results.push(parsed.data);
             }
         });
@@ -88,12 +91,14 @@ const results = [];
             console.log("Finished reading the file.");
             console.log("Results:", results);
             const outlogs = [];
-            for (const result of results) {
+            for (const idx in results) {
+                const result = results[idx];
+                const sig = signatures[idx];
                 const mantissa = new big_js_1.default(result.value.mantissa.toString());
                 const scale = new big_js_1.default(10).pow(result.value.scale);
                 const value = mantissa.div(scale).toString();
                 const timestamp = new Date(result.timestamp.toNumber() * 1000).toUTCString();
-                const outLine = `${timestamp}: ${value}`;
+                const outLine = `${timestamp} - ${sig} ${value}`;
                 outlogs.push(outLine);
             }
             fs.writeFileSync(argv.output, outlogs.join("\n"));

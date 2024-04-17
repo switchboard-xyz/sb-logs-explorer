@@ -38,7 +38,7 @@ const signatures: string[] = [];
     const wallet = new anchor.Wallet(Keypair.generate());
     const provider = new anchor.AnchorProvider(connection, wallet, {});
     const idl = await anchor.Program.fetchIdl(programId, provider);
-    const program = new anchor.Program(idl!, programId, provider);
+    const program = new anchor.Program(idl!, provider);
     const decoder = new anchor.BorshEventCoder(idl!);
     const readInterface = readline.createInterface({
       input: fs.createReadStream(argv.input),
