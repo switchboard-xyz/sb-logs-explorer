@@ -28,7 +28,7 @@ function sortLogs(): Array<string> {
   return output;
 }
 
-const now = new Date().getTime();
+const now = new Date().getTime() / 1000; // milliseconds to seconds
 let argv = yargs(process.argv).options({
   account: {
     type: "string",
@@ -43,13 +43,13 @@ let argv = yargs(process.argv).options({
   },
   startTime: {
     type: "number",
-    describe: "Start time to query transactions (EPOCH time, milliseconds, UTC)",
+    describe: "Start time to query transactions (EPOCH time, seconds, UTC)",
     demand: false,
     default: now - 10 * 60 * 1000, // 10 minutes ago
   },
   endTime: {
     type: "number",
-    describe: "End time to query transactions (EPOCH time, milliseconds, UTC)",
+    describe: "End time to query transactions (EPOCH time, in seconds, UTC)",
     demand: false,
     default: now,
   },
