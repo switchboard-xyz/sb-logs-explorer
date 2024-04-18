@@ -92,7 +92,9 @@ async function getTxSignatureAroundTimestamp(
         })!)!;
         break;
       } catch (error) {
-        console.error("Error fetching block:", error);
+        if (argv.verbose) {
+          console.error("Error fetching block:", error);
+        };
         // generating a random number to avoid loops based on the slot size
         // matching exactly the midSlot retrocession
         midSlot -= Math.floor(Math.random() * 142);
@@ -130,7 +132,9 @@ async function getTxSignatureAroundTimestamp(
       }))!;
       break;
     } catch (error) {
-      console.error("Error fetching block:", error);
+      if (argv.verbose) {
+        console.error("Error fetching block:", error);
+      };
       midSlot -= 100;
     }
   }
@@ -187,7 +191,9 @@ async function loadTransactionLogs(
         });
       break;
     } catch (error) {
-      console.error("Error loading transaction logs:", error);
+      if (argv.verbose) {
+        console.error("Error loading transaction logs:", error);
+      };
       CURRENT_AWAIT_COUNT -= 1;
       await delay(1000);
     }
@@ -285,9 +291,16 @@ function delay(ms: number) {
     //= begin - file based events parsing
     const wallet = new anchor.Wallet(Keypair.generate());
     const provider = new anchor.AnchorProvider(connection, wallet, {});
-    const idl = await anchor.Program.fetchIdl(account, provider);
-    //const program = new anchor.Program(idl!, provider);
+    const idl = (await anchor.Program.fetchIdl(account, provider));
+    if (!idl) {
+      console.error("Program requested not found: ", argv.account);
+      process.exit(1);
+    };
+    console.log(">>>>>>>>>> 4 DEBUG LELE");
+    const program = new anchor.Program(idl!, provider);
+    console.log(">>>>>>>>>> 5 DEBUG LELE");
     const decoder = new anchor.BorshEventCoder(idl!);
+    console.log(">>>>>>>>>> 6 DEBUG LELE");
 
     for (let line in sortedLogs) {
       const parts = line.split(/ +/);
