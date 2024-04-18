@@ -63,7 +63,12 @@ let argv = yargs(process.argv).options({
     type: "string",
     describe: "Output file to write logs to",
     demand: false,
-    default: "output.txt",
+  },
+  verbose: {
+    type: "boolean",
+    describe: "Enable debugging info",
+    demand: false,
+    default: false,
   },
 }).argv;
 
@@ -96,10 +101,13 @@ async function getTxSignatureAroundTimestamp(
       return "";
     }
 
-    console.log(
-      "Guessed block time:",
-      new Date(currentBlock.blockTime! * 1000).toLocaleString()
-    );
+    if (argv.verbose) {
+      console.log(
+        "Guessed block time:",
+        new Date(currentBlock.blockTime! * 1000).toLocaleString()
+      );
+    };
+
     const diff = currentBlock.blockTime! - timestamp;
     if (diff >= 0) {
       maxSlot = midSlot;
@@ -107,6 +115,7 @@ async function getTxSignatureAroundTimestamp(
       minSlot = midSlot;
     }
   }
+
   console.log("Block closest to the timestamp:", minSlot);
   while (true) {
     try {
@@ -145,8 +154,9 @@ async function loadTransactionLogs(
           CURRENT_AWAIT_COUNT += 1;
           HAS_STARTED = true;
           tx = tx!;
-          // Check if transaction exists
-          // console.log(transaction);
+          if (argv.verbose) {
+            console.log(tx);
+          };
           const timestamp = new Date(Number(tx.blockTime) * 1000).toISOString();
           let regex = /Program log: /;
           let regexLen = 13;
@@ -161,7 +171,9 @@ async function loadTransactionLogs(
             log = log.slice(regexLen);
             const out = `${tx.blockTime} (${timestamp}) ${transactionSignature}: ${log}`;
             LOG_MAP.set(tx.blockTime!, out);
-            console.log(out);
+            if (argv.verbose) {
+              console.log(out);
+            };
           }
           if (tx.blockTime! < startTime) {
             ALLOW_MORE_QUERIES = false;
@@ -206,7 +218,9 @@ async function getTransactionSignatures(
     for (let i = 0; i < signatures.length; i++) {
       // Load transaction logs for each signature
       if (ALLOW_MORE_QUERIES) {
-        console.log("Loading logs for signature:", signatures[i].signature);
+        if (argv.verbose) {
+          console.log("Loading logs for signature:", signatures[i].signature);
+        };
         try {
           loadTransactionLogs(
             connection,
@@ -225,7 +239,9 @@ async function getTransactionSignatures(
   }
   CURRENT_AWAIT_COUNT -= 1;
   if (ALLOW_MORE_QUERIES) {
-    console.log("Last signature:", lastSignature);
+    if (argv.verbose) {
+      console.log("Last signature:", lastSignature);
+    };
     await getTransactionSignatures(
       connection,
       account,
@@ -283,6 +299,7 @@ function delay(ms: number) {
 
     //= begin - output to file or stdout
     if (argv.output) {
+      console.log("Writing results to log file:", argv.output);
       const outlogs: string[] = [];
       for (const idx in results) {
         const result = results[idx];
