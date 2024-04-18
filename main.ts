@@ -1,6 +1,11 @@
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, Keypair } from "@solana/web3.js";
+
 import * as fs from "fs";
 const yargs = require("yargs/yargs");
+
+import * as anchor from "@coral-xyz/anchor";
+import * as readline from "readline";
+import Big from "big.js";
 
 let ALLOW_MORE_QUERIES = true;
 let CURRENT_AWAIT_COUNT = 0;
@@ -9,54 +14,62 @@ const LOG_MAP = new Map<number, string>([]);
 
 const sleep = (t: any) => new Promise((s) => setTimeout(s, t));
 
+const results: any[] = [];
+const signatures: string[] = [];
+
 function sortLogs(): Array<string> {
   const sortedEntries = [...LOG_MAP.entries()].sort(
     (a: any, b: any) => a[0] - b[0]
   );
   const output: Array<string> = [];
-  for (let [timestamp, log] of sortedEntries) {
+  for (let [, log] of sortedEntries) {
     output.push(log);
   }
   return output;
 }
 
+const now = new Date().getTime();
 let argv = yargs(process.argv).options({
   account: {
     type: "string",
     describe: "Account to query transaction signatures for",
     demand: true,
   },
-  filter: {
+  url: {
     type: "string",
-    describe: "Substring to filter logs by",
-    demand: true,
+    describe: "URL for the Solana chain the program is running on",
+    demand: false,
+    default: "https://api.mainnet-beta.solana.com",
   },
   startTime: {
     type: "number",
-    describe: "Start time to query transactions",
-    demand: true,
+    describe: "Start time to query transactions (EPOCH time, milliseconds, UTC)",
+    demand: false,
+    default: now - 10 * 60 * 1000, // 10 minutes ago
   },
   endTime: {
     type: "number",
-    describe: "End time to query transactions",
-    demand: true,
+    describe: "End time to query transactions (EPOCH time, milliseconds, UTC)",
+    demand: false,
+    default: now,
   },
-  url: {
+  filter: {
     type: "string",
-    describe: "URL of the Solana RPC endpoint",
-    demand: true,
+    describe: "Substring to filter logs by",
+    demand: false,
+    default: "",
+  },
+  input: {
+    type: "string",
+    describe: "read events from file instead of query them to write logs to",
+    demand: false,
+    default: "output.txt",
   },
   output: {
     type: "string",
     describe: "Output file to write logs to",
     demand: false,
     default: "output.txt",
-  },
-  forEvents: {
-    type: "boolean",
-    describe: "Use this flag to query for events instead of logs",
-    demand: false,
-    default: false,
   },
 }).argv;
 
@@ -235,21 +248,74 @@ function delay(ms: number) {
 
 (async () => {
   try {
+    //= begin - basic setup
     const connection = new Connection(argv.url);
     const account = new PublicKey(argv.account);
-    const startTime = argv.startTime;
-    const endTime = argv.endTime;
-    const sig = await getTxSignatureAroundTimestamp(connection, endTime);
-    console.log("Starting from signature:", sig);
-    getTransactionSignatures(connection, account, sig, startTime, argv.filter);
+    //= end - basic setup
 
-    await delay(1000);
-    while (!HAS_STARTED || CURRENT_AWAIT_COUNT > 0) {
+    if (argv.forEvents) {
+
+
+      const startTime = argv.startTime;
+      const endTime = argv.endTime;
+
+      const sig = await getTxSignatureAroundTimestamp(connection, endTime);
+      console.log("Starting from signature:", sig);
+      getTransactionSignatures(connection, account, sig, startTime, argv.filter);
+
       await delay(1000);
+      while (!HAS_STARTED || CURRENT_AWAIT_COUNT > 0) {
+        await delay(1000);
+      }
+      const sortedLogs = sortLogs();
+      fs.writeFileSync(argv.output, sortedLogs.join("\n"));
+
+    } else {
+
+      const wallet = new anchor.Wallet(Keypair.generate());
+      const provider = new anchor.AnchorProvider(connection, wallet, {});
+      const idl = await anchor.Program.fetchIdl(account, provider);
+      //const program = new anchor.Program(idl!, provider);
+      const decoder = new anchor.BorshEventCoder(idl!);
+      const readInterface = readline.createInterface({
+        input: fs.createReadStream(argv.input),
+        output: process.stdout,
+        terminal: false,
+      });
+      readInterface.on("line", function(line) {
+        const parts = line.split(/ +/);
+        const signature = parts[parts.length - 2];
+        const serialized = parts[parts.length - 1];
+        const parsed = decoder.decode(serialized);
+        if (parsed?.name === argv.eventName) {
+          signatures.push(signature);
+          results.push(parsed!.data);
+        }
+      });
+
+      readInterface.on("close", function() {
+        console.log("Finished reading the file.");
+        console.log("Results:", results);
+        const outlogs: string[] = [];
+        for (const idx in results) {
+          const result = results[idx];
+          const sig = signatures[idx];
+          const mantissa = new Big(result.value.mantissa.toString());
+          const scale = new Big(10).pow(result.value.scale);
+          const value = mantissa.div(scale).toString();
+          const timestamp = new Date(
+            result.timestamp.toNumber() * 1000
+          ).toUTCString();
+          const outLine = `${timestamp} - ${sig} ${value}`;
+          outlogs.push(outLine);
+        }
+        fs.writeFileSync(argv.output, outlogs.join("\n"));
+        process.exit(0);
+      });
     }
-    const sortedLogs = sortLogs();
-    fs.writeFileSync(argv.output, sortedLogs.join("\n"));
   } catch (error) {
     console.error("Caught Error:", error);
   }
+
+  await sleep(1_000_000_000);
 })();
