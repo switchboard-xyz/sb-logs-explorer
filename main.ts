@@ -65,7 +65,6 @@ let argv = yargs(process.argv).options({
     demand: false,
   },
   verbose: {
-    char: "v",
     type: "boolean",
     describe: "Enable debugging info",
     demand: false,
