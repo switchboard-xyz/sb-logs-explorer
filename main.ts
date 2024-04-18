@@ -289,9 +289,14 @@ function delay(ms: number) {
     //= end - events gathering
 
     //= begin - file based events parsing
+    const programId = new PublicKey(
+      "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f"
+    );
     const wallet = new anchor.Wallet(Keypair.generate());
     const provider = new anchor.AnchorProvider(connection, wallet, {});
-    const idl = (await anchor.Program.fetchIdl(account, provider));
+
+    const idl = await anchor.Program.fetchIdl(programId, provider);
+
     if (!idl) {
       console.error("Program requested not found: ", argv.account);
       process.exit(1);
