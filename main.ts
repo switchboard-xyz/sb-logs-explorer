@@ -96,7 +96,7 @@ async function getTxSignatureAroundTimestamp(
         console.error("Error fetching block:", error);
         // generating a random number to avoid loops based on the slot size
         // matching exactly the midSlot retrocession
-        midSlot -= Math.random() * 142;
+        midSlot -= Math.floor(Math.random() * 142);
       }
     }
     if (currentBlock == null) {
@@ -295,10 +295,14 @@ function delay(ms: number) {
       const signature = parts[parts.length - 2];
       const serialized = parts[parts.length - 1];
       const parsed = decoder.decode(serialized);
-      if (parsed?.name === argv.eventName) {
-        signatures.push(signature);
-        results.push(parsed!.data);
-      }
+      if (argv.filter) {
+        let regex = /argv.filter/;
+        if (!regex.test(parsed?.name || "")) {
+          continue;
+        };
+      };
+      signatures.push(signature);
+      results.push(parsed!.data);
     };
     //= end - file based events parsing
 
