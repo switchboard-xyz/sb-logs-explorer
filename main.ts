@@ -65,6 +65,7 @@ let argv = yargs(process.argv).options({
     demand: false,
   },
   verbose: {
+    char: "v",
     type: "boolean",
     describe: "Enable debugging info",
     demand: false,
@@ -93,11 +94,15 @@ async function getTxSignatureAroundTimestamp(
         break;
       } catch (error) {
         console.error("Error fetching block:", error);
-        midSlot -= 100;
+        // generating a random number to avoid loops based on the slot size
+        // matching exactly the midSlot retrocession
+        midSlot -= Math.random() * 142;
       }
     }
     if (currentBlock == null) {
-      console.log("Block not found");
+      if (argv.verbose) {
+        console.log("Block not found");
+      };
       return "";
     }
 
@@ -160,7 +165,7 @@ async function loadTransactionLogs(
           const timestamp = new Date(Number(tx.blockTime) * 1000).toISOString();
           let regex = /Program log: /;
           let regexLen = 13;
-          if (argv.forEvents) {
+          if (argv.filter) {
             regex = /Program data: /;
             regexLen = 14;
           }
