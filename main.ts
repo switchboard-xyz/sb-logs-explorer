@@ -59,12 +59,6 @@ let argv = yargs(process.argv).options({
     demand: false,
     default: "",
   },
-  input: {
-    type: "string",
-    describe: "read events from file instead of query them to write logs to",
-    demand: false,
-    default: "output.txt",
-  },
   output: {
     type: "string",
     describe: "Output file to write logs to",
@@ -266,21 +260,16 @@ function delay(ms: number) {
       await delay(1000);
     }
     const sortedLogs = sortLogs();
-    fs.writeFileSync(argv.output, sortedLogs.join("\n"));
     //= end - events gathering
 
     //= begin - file based events parsing
     const wallet = new anchor.Wallet(Keypair.generate());
     const provider = new anchor.AnchorProvider(connection, wallet, {});
     const idl = await anchor.Program.fetchIdl(account, provider);
-    const program = new anchor.Program(idl!, provider);
+    //const program = new anchor.Program(idl!, provider);
     const decoder = new anchor.BorshEventCoder(idl!);
-    const readInterface = readline.createInterface({
-      input: fs.createReadStream(argv.input),
-      output: process.stdout,
-      terminal: false,
-    });
-    readInterface.on("line", function(line) {
+
+    for (let line in sortedLogs) {
       const parts = line.split(/ +/);
       const signature = parts[parts.length - 2];
       const serialized = parts[parts.length - 1];
@@ -289,11 +278,11 @@ function delay(ms: number) {
         signatures.push(signature);
         results.push(parsed!.data);
       }
-    });
+    };
+    //= end - file based events parsing
 
-    readInterface.on("close", function() {
-      console.log("Finished reading the file.");
-      console.log("Results:", results);
+    //= begin - output to file or stdout
+    if (argv.output) {
       const outlogs: string[] = [];
       for (const idx in results) {
         const result = results[idx];
@@ -307,10 +296,15 @@ function delay(ms: number) {
         const outLine = `${timestamp} - ${sig} ${value}`;
         outlogs.push(outLine);
       }
+
       fs.writeFileSync(argv.output, outlogs.join("\n"));
-      process.exit(0);
-    });
-    //= end - file based events parsing
+    } else {
+      console.log("Results:", results);
+    }
+    //= end - output to file or stdout
+
+    // exit with no errors
+    process.exit(0);
   } catch (error) {
     console.error("Caught Error:", error);
   }
