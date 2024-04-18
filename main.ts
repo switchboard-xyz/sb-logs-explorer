@@ -296,13 +296,11 @@ function delay(ms: number) {
     const provider = new anchor.AnchorProvider(connection, wallet, {});
 
     const idl = await anchor.Program.fetchIdl(programId, provider);
-
     if (!idl) {
       console.error("Program requested not found: ", argv.account);
       process.exit(1);
     };
-    console.log(">>>>>>>>>> 4 DEBUG LELE");
-    const program = new anchor.Program(idl!, provider);
+
     console.log(">>>>>>>>>> 5 DEBUG LELE");
     const decoder = new anchor.BorshEventCoder(idl!);
     console.log(">>>>>>>>>> 6 DEBUG LELE");
