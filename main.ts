@@ -253,66 +253,64 @@ function delay(ms: number) {
     const account = new PublicKey(argv.account);
     //= end - basic setup
 
-    if (argv.forEvents) {
+    //= begin - events gathering
+    const startTime = argv.startTime;
+    const endTime = argv.endTime;
 
+    const sig = await getTxSignatureAroundTimestamp(connection, endTime);
+    console.log("Starting from signature:", sig);
+    getTransactionSignatures(connection, account, sig, startTime, argv.filter);
 
-      const startTime = argv.startTime;
-      const endTime = argv.endTime;
-
-      const sig = await getTxSignatureAroundTimestamp(connection, endTime);
-      console.log("Starting from signature:", sig);
-      getTransactionSignatures(connection, account, sig, startTime, argv.filter);
-
+    await delay(1000);
+    while (!HAS_STARTED || CURRENT_AWAIT_COUNT > 0) {
       await delay(1000);
-      while (!HAS_STARTED || CURRENT_AWAIT_COUNT > 0) {
-        await delay(1000);
-      }
-      const sortedLogs = sortLogs();
-      fs.writeFileSync(argv.output, sortedLogs.join("\n"));
-
-    } else {
-
-      const wallet = new anchor.Wallet(Keypair.generate());
-      const provider = new anchor.AnchorProvider(connection, wallet, {});
-      const idl = await anchor.Program.fetchIdl(account, provider);
-      //const program = new anchor.Program(idl!, provider);
-      const decoder = new anchor.BorshEventCoder(idl!);
-      const readInterface = readline.createInterface({
-        input: fs.createReadStream(argv.input),
-        output: process.stdout,
-        terminal: false,
-      });
-      readInterface.on("line", function(line) {
-        const parts = line.split(/ +/);
-        const signature = parts[parts.length - 2];
-        const serialized = parts[parts.length - 1];
-        const parsed = decoder.decode(serialized);
-        if (parsed?.name === argv.eventName) {
-          signatures.push(signature);
-          results.push(parsed!.data);
-        }
-      });
-
-      readInterface.on("close", function() {
-        console.log("Finished reading the file.");
-        console.log("Results:", results);
-        const outlogs: string[] = [];
-        for (const idx in results) {
-          const result = results[idx];
-          const sig = signatures[idx];
-          const mantissa = new Big(result.value.mantissa.toString());
-          const scale = new Big(10).pow(result.value.scale);
-          const value = mantissa.div(scale).toString();
-          const timestamp = new Date(
-            result.timestamp.toNumber() * 1000
-          ).toUTCString();
-          const outLine = `${timestamp} - ${sig} ${value}`;
-          outlogs.push(outLine);
-        }
-        fs.writeFileSync(argv.output, outlogs.join("\n"));
-        process.exit(0);
-      });
     }
+    const sortedLogs = sortLogs();
+    fs.writeFileSync(argv.output, sortedLogs.join("\n"));
+    //= end - events gathering
+
+    //= begin - file based events parsing
+    const wallet = new anchor.Wallet(Keypair.generate());
+    const provider = new anchor.AnchorProvider(connection, wallet, {});
+    const idl = await anchor.Program.fetchIdl(account, provider);
+    const program = new anchor.Program(idl!, provider);
+    const decoder = new anchor.BorshEventCoder(idl!);
+    const readInterface = readline.createInterface({
+      input: fs.createReadStream(argv.input),
+      output: process.stdout,
+      terminal: false,
+    });
+    readInterface.on("line", function(line) {
+      const parts = line.split(/ +/);
+      const signature = parts[parts.length - 2];
+      const serialized = parts[parts.length - 1];
+      const parsed = decoder.decode(serialized);
+      if (parsed?.name === argv.eventName) {
+        signatures.push(signature);
+        results.push(parsed!.data);
+      }
+    });
+
+    readInterface.on("close", function() {
+      console.log("Finished reading the file.");
+      console.log("Results:", results);
+      const outlogs: string[] = [];
+      for (const idx in results) {
+        const result = results[idx];
+        const sig = signatures[idx];
+        const mantissa = new Big(result.value.mantissa.toString());
+        const scale = new Big(10).pow(result.value.scale);
+        const value = mantissa.div(scale).toString();
+        const timestamp = new Date(
+          result.timestamp.toNumber() * 1000
+        ).toUTCString();
+        const outLine = `${timestamp} - ${sig} ${value}`;
+        outlogs.push(outLine);
+      }
+      fs.writeFileSync(argv.output, outlogs.join("\n"));
+      process.exit(0);
+    });
+    //= end - file based events parsing
   } catch (error) {
     console.error("Caught Error:", error);
   }
