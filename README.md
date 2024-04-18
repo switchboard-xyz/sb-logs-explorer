@@ -6,8 +6,11 @@ git clone https://github.com/switchboard-xyz/sb-logs-explorer
 cd sb-logs-explorer
 
 
+docker run --rm -it --entrypoint /bin/bash -v $(pwd):/app docker.io/library/node:21-bookworm
+# inside the docker container
 cd /app && ./init.sh
 ```
+Now check the examples below or the `--help`.
 
 # Examples
 
