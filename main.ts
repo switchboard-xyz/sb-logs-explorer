@@ -162,27 +162,28 @@ async function loadTransactionLogs(
           CURRENT_AWAIT_COUNT += 1;
           HAS_STARTED = true;
           tx = tx!;
-          if (argv.verbose) {
-            console.log(tx);
-          };
+          // TOO verbose
+          // if (argv.verbose) {
+          //   console.log(tx);
+          // };
           const timestamp = new Date(Number(tx.blockTime) * 1000).toISOString();
-          let regex = /Program log: /;
-          let regexLen = 13;
-          if (argv.filter) {
-            regex = /Program data: /;
-            regexLen = 14;
-          }
-          const logs = tx
-            .meta!.logMessages!.filter((m) => regex.test(m))
-            .filter((m) => m.includes(filter));
+
+          let logs: Array<string> = [];
+          if (filter) {
+            let regex = /filter/;
+            logs = tx
+              .meta!.logMessages!.filter((m) => regex.test(m))
+              .filter((m) => m.includes(filter));
+          } else {
+            logs = tx.meta!.logMessages!;
+          };
+
           for (let log of logs) {
-            log = log.slice(regexLen);
+            //log = log.slice(regexLen);
             const out = `${tx.blockTime} (${timestamp}) ${transactionSignature}: ${log}`;
             LOG_MAP.set(tx.blockTime!, out);
-            if (argv.verbose) {
-              console.log(out);
-            };
           }
+
           if (tx.blockTime! < startTime) {
             ALLOW_MORE_QUERIES = false;
           }
@@ -300,49 +301,59 @@ function delay(ms: number) {
       console.error("Program requested not found: ", argv.account);
       process.exit(1);
     };
+    const decoder = new anchor.BorshEventCoder(idl);
 
-    console.log(">>>>>>>>>> 5 DEBUG LELE");
-    const decoder = new anchor.BorshEventCoder(idl!);
-    console.log(">>>>>>>>>> 6 DEBUG LELE");
+    for (var line of sortedLogs) {
+      if (argv.verbose) {
+        console.log("line: ", line);
+      };
 
-    for (let line in sortedLogs) {
       const parts = line.split(/ +/);
-      const signature = parts[parts.length - 2];
-      const serialized = parts[parts.length - 1];
-      const parsed = decoder.decode(serialized);
-      if (argv.filter) {
-        let regex = /argv.filter/;
-        if (!regex.test(parsed?.name || "")) {
-          continue;
-        };
+      if (argv.verbose) {
+        console.log("parts: ", parts);
+      };
+      const signature = parts[2].replace(":", "");
+      if (argv.verbose) {
+        console.log("signature: ", signature);
       };
       signatures.push(signature);
-      results.push(parsed!.data);
-    };
-    //= end - file based events parsing
 
-    //= begin - output to file or stdout
-    if (argv.output) {
-      console.log("Writing results to log file:", argv.output);
-      const outlogs: string[] = [];
-      for (const idx in results) {
-        const result = results[idx];
-        const sig = signatures[idx];
-        const mantissa = new Big(result.value.mantissa.toString());
-        const scale = new Big(10).pow(result.value.scale);
-        const value = mantissa.div(scale).toString();
-        const timestamp = new Date(
-          result.timestamp.toNumber() * 1000
-        ).toUTCString();
-        const outLine = `${timestamp} - ${sig} ${value}`;
-        outlogs.push(outLine);
+      //= check if line is data and needs decoding
+      if (parts[4] == "data:") {
+        const serialized = parts[5];
+        if (argv.verbose) {
+          console.log("serialized: ", serialized);
+        };
+        const parsed = decoder.decode(serialized);
+        if (argv.verbose) {
+          console.log("parsed: ", parsed);
+        };
+
+        results.push(parsed!.data);
+      };
+
+      //= begin - output to file or stdout
+      if (argv.output) {
+        console.log("Writing results to log file:", argv.output);
+        const outlogs: string[] = [];
+        for (const idx in results) {
+          const result = results[idx];
+          const sig = signatures[idx];
+          const mantissa = new Big(result.value.mantissa.toString());
+          const scale = new Big(10).pow(result.value.scale);
+          const value = mantissa.div(scale).toString();
+          const timestamp = new Date(
+            result.timestamp.toNumber() * 1000
+          ).toUTCString();
+          const outLine = `${timestamp} - ${sig} ${value}`;
+          outlogs.push(outLine);
+        }
+
+        fs.writeFileSync(argv.output, outlogs.join("\n"));
+      } else {
+        console.log("Results:", results);
       }
-
-      fs.writeFileSync(argv.output, outlogs.join("\n"));
-    } else {
-      console.log("Results:", results);
-    }
-    //= end - output to file or stdout
+    };
 
     // exit with no errors
     process.exit(0);
