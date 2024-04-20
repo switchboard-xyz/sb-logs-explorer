@@ -7,28 +7,18 @@ import * as anchor from "@coral-xyz/anchor";
 import * as readline from "readline";
 import Big from "big.js";
 
+//= begin - globals
+
 let ALLOW_MORE_QUERIES = true;
 let CURRENT_AWAIT_COUNT = 0;
 let HAS_STARTED = false;
-const LOG_MAP = new Map<number, string>([]);
 
-const sleep = (t: any) => new Promise((s) => setTimeout(s, t));
+const LOG_MAP = new Map<number, string>([]);
 
 const results: any[] = [];
 const signatures: string[] = [];
 
-function sortLogs(): Array<string> {
-  const sortedEntries = [...LOG_MAP.entries()].sort(
-    (a: any, b: any) => a[0] - b[0]
-  );
-  const output: Array<string> = [];
-  for (let [, log] of sortedEntries) {
-    output.push(log);
-  }
-  return output;
-}
-
-const now = new Date().getTime() / 1000; // milliseconds to seconds
+const now = Math.floor(new Date().getTime() / 1000); // milliseconds to seconds
 let argv = yargs(process.argv).options({
   account: {
     type: "string",
@@ -43,9 +33,9 @@ let argv = yargs(process.argv).options({
   },
   startTime: {
     type: "number",
-    describe: "Start time to query transactions (EPOCH time, seconds, UTC)",
+    describe: "Start time to query transactions (EPOCH time, in seconds, UTC)",
     demand: false,
-    default: now - 10 * 60 * 1000, // 10 minutes ago
+    default: now - (10 * 60), // 10 minutes ago
   },
   endTime: {
     type: "number",
@@ -64,6 +54,12 @@ let argv = yargs(process.argv).options({
     describe: "Output file to write logs to",
     demand: false,
   },
+  limit: {
+    type: "number",
+    describe: "Maximum number of signatures to analyze",
+    demand: false,
+    default: 1000,
+  },
   verbose: {
     type: "boolean",
     describe: "Enable debugging info",
@@ -71,6 +67,31 @@ let argv = yargs(process.argv).options({
     default: false,
   },
 }).argv;
+
+//= end - globals
+
+//= begin - utility functions
+
+const sleep = (t: any) => new Promise((s) => setTimeout(s, t));
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+//= end - utility functions
+
+//= begin - business logic functions
+
+function sortLogs(): Array<string> {
+  const sortedEntries = [...LOG_MAP.entries()].sort(
+    (a: any, b: any) => a[0] - b[0]
+  );
+  const output: Array<string> = [];
+  for (let [, log] of sortedEntries) {
+    output.push(log);
+  }
+  return output;
+}
 
 async function getTxSignatureAroundTimestamp(
   connection: Connection,
@@ -81,6 +102,8 @@ async function getTxSignatureAroundTimestamp(
   let currentBlock;
   let midSlot = 0;
   console.log("Goal block time:", new Date(timestamp * 1000).toLocaleString());
+
+  //= begin - binary search to find a block close enough to the desired one
   while (maxSlot - minSlot > 10) {
     midSlot = minSlot + Math.floor((maxSlot - minSlot) / 2);
     while (true) {
@@ -121,8 +144,10 @@ async function getTxSignatureAroundTimestamp(
       minSlot = midSlot;
     }
   }
+  //= end - binary search to find a block close enough to the desired one
 
   console.log("Block closest to the timestamp:", minSlot);
+  //= begin - sequential scan to find the desired block now that we're close enough
   while (true) {
     try {
       currentBlock = (await connection.getBlock(midSlot, {
@@ -138,6 +163,7 @@ async function getTxSignatureAroundTimestamp(
       midSlot -= 100;
     }
   }
+  //= end - sequential scan to find the desired block now that we're close enough
   return currentBlock.transactions[0].transaction.signatures[0];
 }
 
@@ -162,7 +188,7 @@ async function loadTransactionLogs(
           CURRENT_AWAIT_COUNT += 1;
           HAS_STARTED = true;
           tx = tx!;
-          // TOO verbose
+          // WAY TOO verbose
           // if (argv.verbose) {
           //   console.log(tx);
           // };
@@ -170,9 +196,7 @@ async function loadTransactionLogs(
 
           let logs: Array<string> = [];
           if (filter) {
-            let regex = /filter/;
-            logs = tx
-              .meta!.logMessages!.filter((m) => regex.test(m))
+            logs = tx.meta!.logMessages!
               .filter((m) => m.includes(filter));
           } else {
             logs = tx.meta!.logMessages!;
@@ -221,7 +245,7 @@ async function getTransactionSignatures(
     const signatures = await connection.getConfirmedSignaturesForAddress2(
       account,
       {
-        limit: 1000,
+        limit: argv.limit,
         before: beforeSignature,
       }
     );
@@ -263,9 +287,9 @@ async function getTransactionSignatures(
   }
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+//= end - business logic functions
+
+//= begin - main loop
 
 (async () => {
   try {
@@ -278,6 +302,13 @@ function delay(ms: number) {
     const startTime = argv.startTime;
     const endTime = argv.endTime;
 
+    if (startTime >= endTime) {
+      console.log("startTime should be earlier than endTime");
+      console.log("startTime : ", startTime, new Date(startTime * 1000).toISOString());
+      console.log("endTime   : ", endTime, new Date(endTime * 1000).toISOString());
+      process.exit(1);
+    };
+
     const sig = await getTxSignatureAroundTimestamp(connection, endTime);
     console.log("Starting from signature:", sig);
     getTransactionSignatures(connection, account, sig, startTime, argv.filter);
@@ -286,10 +317,25 @@ function delay(ms: number) {
     while (!HAS_STARTED || CURRENT_AWAIT_COUNT > 0) {
       await delay(1000);
     }
+
     const sortedLogs = sortLogs();
     //= end - events gathering
 
-    //= begin - file based events parsing
+    //= begin - output to file or stdout
+    if (argv.output) {
+      console.log("Writing results to log file:", argv.output);
+
+      fs.writeFileSync(argv.output, sortedLogs.join("\n"));
+    } else {
+      console.log(sortedLogs.join("\n"));
+    }
+    //= end - output to file or stdout
+    /*
+
+    // TODO: add a feature like --data or similar that focuses on logs
+    // with `Program data: `
+
+    //= begin - events parsing
     const programId = new PublicKey(
       "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f"
     );
@@ -329,7 +375,18 @@ function delay(ms: number) {
           console.log("parsed: ", parsed);
         };
 
-        results.push(parsed!.data);
+        const result = parsed!.data;
+        const sig = signature;
+
+        const mantissa = new Big(result.value.mantissa.toString());
+        const scale = new Big(10).pow(result.value.scale);
+        const value = mantissa.div(scale).toString();
+        const timestamp = new Date(
+          result.timestamp.toNumber() * 1000
+        ).toUTCString();
+
+        const outLine = `${timestamp} - ${sig} ${value}`;
+        outlogs.push(outLine);
       };
 
       //= begin - output to file or stdout
@@ -352,14 +409,18 @@ function delay(ms: number) {
         fs.writeFileSync(argv.output, outlogs.join("\n"));
       } else {
         console.log("Results:", results);
-      }
+      };
     };
+    //= end - events parsing
+    */
 
     // exit with no errors
     process.exit(0);
   } catch (error) {
     console.error("Caught Error:", error);
-  }
+  };
 
-  await sleep(1_000_000_000);
+  await sleep(3600); // 1 hour
+  process.exit(1);
 })();
+//= end - main loop
